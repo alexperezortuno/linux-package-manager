@@ -1,7 +1,7 @@
-# Ubuntu updater
+# Linux Package Manager
 
-This script compiles a list of useful commands for Ubuntu, this install, remove, update and upgrade packages and other
-things
+This script compiles a list of useful commands for Linux distributions, this install, remove, update and upgrade packages and other
+things across multiple distributions.
 
 ## Install
 
@@ -13,14 +13,14 @@ $ ./install
 ## Running commands
 
 ```
-$ updater -h
+$ lpm -h
 ```
 
-## 🔹 Ubuntu/Debian Updater 🔹
-    Automates system updates, upgrades, and cleanup tasks.
+## 🔹 Linux Package Manager (lpm) 🔹
+    Automates system updates, upgrades, and cleanup tasks across distributions.
 
     📌 Usage:
-      updater [OPTION]
+      lpm [OPTION]
 
     🛠️ Options:
       -h, --help             Show this help message.

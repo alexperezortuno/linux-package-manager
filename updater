@@ -11,11 +11,11 @@ Blu='\033[0;34m'  # Blue
 
 show_commands() {
     cat << EOF
-    🔹 Ubuntu/Debian Updater 🔹
-    Automates system updates, upgrades, and cleanup tasks.
+    🔹 Linux Package Manager (lpm) 🔹
+    Automates system updates, upgrades, and cleanup tasks across distributions.
 
     📌 Usage:
-      updater [OPTION]
+      lpm [OPTION]
 
     🛠️ Options:
       -h, --help             Show this help message.
@@ -64,7 +64,7 @@ show_commands() {
     service-restart <srv> Restart a service
 
     💡 Tip: Replace [PACKAGE] with package name and [PPA] with PPA path
-    🔗 Repository: https://github.com/alexperezortuno/ubuntu-updater
+    🔗 Repository: https://github.com/alexperezortuno/linux-package-manager
 EOF
 }
 
