@@ -3,6 +3,14 @@
 This script compiles a list of useful commands for Linux distributions, this install, remove, update and upgrade packages and other
 things across multiple distributions.
 
+## Supported Distributions
+
+- **Debian/Ubuntu**: Uses `apt` package manager
+- **Arch Linux/ArcoLinux**: Uses `pacman` package manager
+- **Fedora/RHEL/Rocky/Alma**: Uses `dnf` package manager
+
+The script automatically detects your distribution and uses the appropriate package manager.
+
 ## Install
 
 ```
@@ -31,7 +39,7 @@ $ lpm -h
 
     📚 Available options
 
-    clean       Clean downloaded .deb packages from cache
+    clean       Clean package cache
     cache:stats Show cache statistics
 
     📦 Package Management
@@ -40,12 +48,12 @@ $ lpm -h
     pkg:upgrade [PACKAGE]      Upgrade specific package
     pkg:remove [PACKAGE]       Remove a package
     pkg:find [PACKAGE]         Search for a package
-    pkg:download [PACKAGE]     Download package source code
+    pkg:download [PACKAGE]     Download package
     pkg:dependencies [PACKAGE] Check package dependencies
     pkg:description [PACKAGE]  Show package description
     pkg:descriptions           List all packages with descriptions
 
-    🔄 PPA Management
+    🔄 PPA Management (Debian/Ubuntu only)
     ppa:list          List configured PPAs
     ppa:install <ppa> Add a PPA
     ppa:remove <ppa>  Remove a PPA
@@ -68,4 +76,4 @@ $ lpm -h
     service-list          List active services
     service-restart <srv> Restart a service
 
-    💡 Tip: Replace [PACKAGE] with package name and <ppa> with PPA path
+    💡 Tip: Replace [PACKAGE] with package name
