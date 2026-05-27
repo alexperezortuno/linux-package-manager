@@ -15,10 +15,16 @@ detect_distro() {
     DISTRO="debian"
     PACKAGE_MANAGER="apt"
     
-    # Check for Arch-based distributions
+    # Check /etc/os-release for distribution info
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
-        if [[ "$ID" == "arch" ]] || [[ "$ID_LIKE" == *"arch"* ]] || [[ "$ID" == "arcolinux" ]]; then
+        
+        # Check for Fedora/RHEL/CentOS
+        if [[ "$ID" == "fedora" ]] || [[ "$ID" == "rhel" ]] || [[ "$ID" == "centos" ]] || [[ "$ID" == "rocky" ]] || [[ "$ID" == "alma" ]]; then
+            DISTRO="fedora"
+            PACKAGE_MANAGER="dnf"
+        # Check for Arch-based distributions
+        elif [[ "$ID" == "arch" ]] || [[ "$ID_LIKE" == *"arch"* ]] || [[ "$ID" == "arcolinux" ]]; then
             DISTRO="arch"
             PACKAGE_MANAGER="pacman"
         fi
@@ -26,14 +32,74 @@ detect_distro() {
     
     # Fallback check for pacman presence
     if command -v pacman &> /dev/null; then
-        # Additional check to confirm this is an Arch-based system
         if [[ -f /etc/arch-release ]] || [[ "$DISTRO" == "arch" ]]; then
             DISTRO="arch"
             PACKAGE_MANAGER="pacman"
         fi
     fi
     
+    # Fallback check for dnf presence (Fedora/RHEL)
+    if command -v dnf &> /dev/null; then
+        DISTRO="fedora"
+        PACKAGE_MANAGER="dnf"
+    fi
+    
     echo "$PACKAGE_MANAGER"
+}
+
+# Function to show help for Fedora/RHEL distributions
+show_commands_fedora() {
+    cat << EOF
+    🔹 Linux Package Manager (lpm) 🔹
+    Automates system updates, upgrades, and cleanup tasks across distributions.
+
+    📌 Usage:
+      lpm [OPTION]
+
+    🛠️ Options:
+      -h, --help             Show this help message.
+      -v, --version          Show script version.
+
+    🔧 System Maintenance
+    (no args)   Update, upgrade and clean all
+
+    📚 Available options
+
+    clean       Clean package cache
+    cache:stats Show cache statistics
+
+    📦 Package Management
+    pkg:install [PACKAGE]      Install a package
+    pkg:installed              List installed packages
+    pkg:upgrade [PACKAGE]      Upgrade specific package
+    pkg:remove [PACKAGE]       Remove a package
+    pkg:find [PACKAGE]         Search for a package
+    pkg:download [PACKAGE]     Download package (not installed)
+    pkg:dependencies [PACKAGE] Check package dependencies
+    pkg:description [PACKAGE]  Show package description
+    pkg:descriptions           List all packages with descriptions
+
+    💾 Memory Management
+    freemem         Free up memory
+
+    📊 Monitoring
+    sys-info        Show system information
+    disk-usage      Show disk usage by partition
+    memory-info     Show detailed memory usage
+
+    🛡️ Security
+    ufw-status       Show UFW status
+    ports-list       List open ports and associated services
+    check-updates    Check for security updates
+    killport <port>  Kill process using a port
+
+    ⚙️ Services
+    service-list          List active services
+    service-restart <srv> Restart a service
+
+    💡 Tip: Replace [PACKAGE] with package name
+    🔗 Repository: https://github.com/alexperezortuno/linux-package-manager
+EOF
 }
 
 # Function to show help for Arch-based distributions
@@ -97,6 +163,8 @@ show_commands() {
     
     if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         show_commands_arch
+    elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        show_commands_fedora
     else
         cat << EOF
     🔹 Linux Package Manager (lpm) 🔹
@@ -166,6 +234,8 @@ case "$PARAM_1" in
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         sudo pacman -Sc --noconfirm
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        sudo dnf clean all
       else
         sudo apt autoremove; sudo apt clean; sudo apt autoclean
       fi
@@ -178,6 +248,8 @@ case "$PARAM_1" in
         PACKAGE_MANAGER=$(detect_distro)
         if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
           sudo pacman -Rns "$PARAM_2"
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          sudo dnf remove "$PARAM_2" -y
         else
           sudo apt remove --purge "$PARAM_2"
           sudo apt autoremove
@@ -192,6 +264,8 @@ case "$PARAM_1" in
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         sudo pacman -S --noconfirm "${PARAM_2}"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        sudo dnf install -y "${PARAM_2}"
       else
         sudo apt install "${PARAM_2}"
       fi
@@ -203,6 +277,8 @@ case "$PARAM_1" in
         PACKAGE_MANAGER=$(detect_distro)
         if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
           sudo pacman -S --noconfirm "$PARAM_2"
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          sudo dnf update "$PARAM_2" -y
         else
           sudo apt install "$PARAM_2" --only-upgrade
         fi
@@ -215,6 +291,8 @@ case "$PARAM_1" in
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         pacman -Q | less
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        dnf list installed | less
       else
         sudo apt list --installed | less
       fi
@@ -226,6 +304,8 @@ case "$PARAM_1" in
         PACKAGE_MANAGER=$(detect_distro)
         if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
           pacman -Qqs "$PARAM_2"
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          dnf list "$PARAM_2" | grep -i "$PARAM_2"
         else
           sudo apt list --installed | grep -i "$PARAM_2"
         fi
@@ -241,6 +321,8 @@ case "$PARAM_1" in
         PACKAGE_MANAGER=$(detect_distro)
         if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
           pacman -Qi "$PARAM_2" | less
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          dnf info "$PARAM_2" | less
         else
           apt-cache show "$PARAM_2" | less
         fi
@@ -256,6 +338,8 @@ case "$PARAM_1" in
         PACKAGE_MANAGER=$(detect_distro)
         if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
           pacman -Si "$PARAM_2" | less
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          dnf search "$PARAM_2" | less
         else
           apt-cache search "$PARAM_2" | less
         fi
@@ -270,6 +354,8 @@ case "$PARAM_1" in
         PACKAGE_MANAGER=$(detect_distro)
         if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
           pactree "$PARAM_2" | less
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          dnf repoquery --requires "$PARAM_2" | less
         else
           apt-cache showpkg "$PARAM_2" | less
         fi
@@ -285,6 +371,9 @@ case "$PARAM_1" in
         if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
           echo -e "${Yel}Downloading package ${PARAM_2}${RCol}\n";
           pacman -Sw "$PARAM_2" --noconfirm
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          echo -e "${Yel}Downloading package ${PARAM_2}${RCol}\n";
+          dnf download "$PARAM_2"
         else
           sudo apt-get --download-only source "$PARAM_2"
         fi
@@ -297,6 +386,8 @@ case "$PARAM_1" in
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         pacman -Q
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        dnf list installed
       else
         dpkg --list
       fi
@@ -306,6 +397,9 @@ case "$PARAM_1" in
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Yel}PPAs are not used in Arch Linux${RCol}\n";
         echo -e "${Yel}Use /etc/pacman.conf for repository configuration${RCol}\n";
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Yel}RPMFusion and other repos configured in /etc/yum.repos.d/${RCol}\n";
+        ls /etc/yum.repos.d/ | grep -E '\.repo$' | head -10
       else
         apt policy
       fi
@@ -315,6 +409,9 @@ case "$PARAM_1" in
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Yel}PPAs are not used in Arch Linux${RCol}\n";
         echo -e "${Yel}Use pacman.conf or AUR helpers instead${RCol}\n";
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Yel}RPM-based systems use repos in /etc/yum.repos.d/${RCol}\n";
+        echo -e "${Yel}Use 'dnf install dnf-plugins-core' then 'dnf config-manager --add-repo <repo>'${RCol}\n";
       else
         if [[ "$PARAM_2" != "" ]]
         then
@@ -330,6 +427,8 @@ case "$PARAM_1" in
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Yel}PPAs are not used in Arch Linux${RCol}\n";
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Yel}RPM-based systems use repo removal from /etc/yum.repos.d/${RCol}\n";
       else
         if [[ "$PARAM_2" != "" ]]
         then
@@ -348,6 +447,11 @@ case "$PARAM_1" in
         ls -lh /var/cache/pacman/pkg/ | tail -5
         echo -e "\n${Gre}Total packages in cache:${RCol}"
         ls /var/cache/pacman/pkg/ | wc -l
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Gre}DNF cache directory:${RCol}"
+        ls -lh /var/cache/dnf/ | tail -5
+        echo -e "\n${Gre}Total packages in cache:${RCol}"
+        ls /var/cache/dnf/ | wc -l
       else
         apt-cache stats
       fi
@@ -375,6 +479,9 @@ case "$PARAM_1" in
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Gre}Fixing broken packages...${RCol}"
         sudo pacman -S --overwrite '*' --noconfirm
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Gre}Fixing broken packages...${RCol}"
+        sudo dnf distro-sync --noconfirm
       else
         echo -e "${Gre}Fixing broken packages...${RCol}"
         sudo apt --fix-broken install
@@ -385,6 +492,9 @@ case "$PARAM_1" in
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Gre}Cleaning old kernels...${RCol}"
         sudo pacman -Rns $(pacman -Qq | grep -E 'linux-lts|linux-zen|linux-hardened' | grep -v $(uname -r | cut -d'-' -f1-2)) --noconfirm 2>/dev/null || echo "No old kernels found"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Gre}Cleaning old kernels...${RCol}"
+        sudo dnf remove $(dnf list --installed | grep -E 'kernel' | grep -v $(uname -r) | awk '{print $1}') --noconfirm 2>/dev/null || echo "No old kernels found"
       else
         sudo apt purge $(dpkg -l | awk '/^ii linux-image-*/{print $2}' | grep -v $(uname -r))
       fi
@@ -394,6 +504,9 @@ case "$PARAM_1" in
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Gre}Checking repository sources...${RCol}"
         sudo pacman -Sy 2>&1 | grep -i "error\|failed"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Gre}Checking repository sources...${RCol}"
+        sudo dnf check-update 2>&1 | grep -i "error\|failed"
       else
         sudo apt update 2>&1 | grep -i "failed\|error"
       fi
@@ -403,6 +516,8 @@ case "$PARAM_1" in
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         pacman -Ss "$2"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        dnf search "$2"
       else
         apt search "$2"
       fi
@@ -413,6 +528,9 @@ case "$PARAM_1" in
       echo -e "Uptime: $(uptime -p)"
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        . /etc/os-release
+        echo -e "OS: $NAME $VERSION"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
         . /etc/os-release
         echo -e "OS: $NAME $VERSION"
       else
@@ -451,6 +569,9 @@ case "$PARAM_1" in
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Yel} Updating packages ${RCol}";
         sudo pacman -Syu --noconfirm
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Yel} Updating packages ${RCol}";
+        sudo dnf update -y
       else
         echo -e "${Yel} Updating packages ${RCol}";
         sudo apt update; apt list --upgradable && sudo apt upgrade -y && sudo apt autoremove; sudo apt clean; sudo apt autoclean

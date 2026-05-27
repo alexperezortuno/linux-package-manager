@@ -7,6 +7,7 @@ things across multiple distributions.
 
 - **Debian/Ubuntu**: Uses `apt` package manager
 - **Arch Linux/ArcoLinux**: Uses `pacman` package manager
+- **Fedora/RHEL/Rocky/Alma**: Uses `dnf` package manager
 
 The script automatically detects your distribution and uses the appropriate package manager.
 
