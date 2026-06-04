@@ -2,159 +2,715 @@
 
 PARAM_1=$1
 PARAM_2=$2
-RCol='\e[0m';
-Yel='\e[0;33m';
-Red='\e[0;31m';
-Gre='\e[0;32m';
+
+# Persistence
+LPM_STATE_DIR="${HOME}/.lpm"
+LPM_STATE_FILE="${LPM_STATE_DIR}/state"
+LPM_HISTORY_FILE="${LPM_STATE_DIR}/history"
+
+# Ensure state directory exists, create if missing
+function ensure_state_dir() {
+    [[ -d "$LPM_STATE_DIR" ]] || mkdir -p "$LPM_STATE_DIR"
+}
+
+# Load persisted state from file, or initialize defaults if file missing
+function load_state() {
+    ensure_state_dir
+    if [[ -f "$LPM_STATE_FILE" ]]; then
+        source "$LPM_STATE_FILE"
+    else
+        LAST_UPDATE="never"
+        LAST_CLEAN="never"
+        INSTALL_COUNT=0
+        UPDATE_COUNT=0
+    fi
+}
+
+# Persist current state to file
+function save_state() {
+    ensure_state_dir
+    cat > "$LPM_STATE_FILE" << EOF
+LAST_UPDATE="${LAST_UPDATE}"
+LAST_CLEAN="${LAST_CLEAN}"
+INSTALL_COUNT=${INSTALL_COUNT}
+UPDATE_COUNT=${UPDATE_COUNT}
+EOF
+}
+
+# Increment install counter and persist
+function record_install() {
+    load_state
+    INSTALL_COUNT=$((INSTALL_COUNT + 1))
+    save_state
+}
+
+# Record last update timestamp and increment update counter
+function record_update() {
+    load_state
+    LAST_UPDATE=$(date +"%Y-%m-%d %H:%M:%S")
+    UPDATE_COUNT=$((UPDATE_COUNT + 1))
+    save_state
+}
+
+# Record last clean timestamp
+function record_clean() {
+    load_state
+    LAST_CLEAN=$(date +"%Y-%m-%d %H:%M:%S")
+    save_state
+}
+
+# Colors
+RCol='\033[0m'    # Text Reset
+Red='\033[0;31m'  # Red
+Gre='\033[0;32m'  # Green
+Yel='\033[0;33m'  # Yellow
+Blu='\033[0;34m'  # Blue
+
+# Function to detect Linux distribution and package manager
+detect_distro() {
+    # Default to Debian/Ubuntu (apt)
+    DISTRO="debian"
+    PACKAGE_MANAGER="apt"
+
+    # Check /etc/os-release for distribution info
+    if [[ -f /etc/os-release ]]; then
+        . /etc/os-release
+
+        # Check for Fedora/RHEL/CentOS
+        if [[ "$ID" == "fedora" ]] || [[ "$ID" == "rhel" ]] || [[ "$ID" == "centos" ]] || [[ "$ID" == "rocky" ]] || [[ "$ID" == "alma" ]]; then
+            DISTRO="fedora"
+            PACKAGE_MANAGER="dnf"
+        # Check for Arch-based distributions
+        elif [[ "$ID" == "arch" ]] || [[ "$ID_LIKE" == *"arch"* ]] || [[ "$ID" == "arcolinux" ]]; then
+            DISTRO="arch"
+            PACKAGE_MANAGER="pacman"
+        fi
+    fi
+
+    # Fallback check for pacman presence
+    if command -v pacman &> /dev/null; then
+        if [[ -f /etc/arch-release ]] || [[ "$DISTRO" == "arch" ]]; then
+            DISTRO="arch"
+            PACKAGE_MANAGER="pacman"
+        fi
+    fi
+
+    # Fallback check for dnf presence (Fedora/RHEL)
+    if command -v dnf &> /dev/null; then
+        DISTRO="fedora"
+        PACKAGE_MANAGER="dnf"
+    fi
+
+    echo "$PACKAGE_MANAGER"
+}
+
+# Function to show help for Fedora/RHEL distributions
+show_commands_fedora() {
+    cat << EOF
+    🔹 Linux Package Manager (lpm) 🔹
+    Automates system updates, upgrades, and cleanup tasks across distributions.
+
+    📌 Usage:
+      lpm [OPTION]
+
+    🛠️ Options:
+      -h, --help             Show this help message.
+      -v, --version          Show script version.
+
+    🔧 System Maintenance
+    (no args)   Update, upgrade and clean all
+
+    📚 Available options
+
+    clean       Clean package cache
+    cache:stats Show cache statistics
+
+    📦 Package Management
+    pkg:install [PACKAGE]      Install a package
+    pkg:installed              List installed packages
+    pkg:upgrade [PACKAGE]      Upgrade specific package
+    pkg:remove [PACKAGE]       Remove a package
+    pkg:find [PACKAGE]         Search for a package
+    pkg:download [PACKAGE]     Download package (not installed)
+    pkg:dependencies [PACKAGE] Check package dependencies
+    pkg:description [PACKAGE]  Show package description
+    pkg:descriptions           List all packages with descriptions
+
+    💾 Memory Management
+    freemem         Free up memory
+
+    📊 Monitoring
+    sys-info        Show system information
+    disk-usage      Show disk usage by partition
+    memory-info     Show detailed memory usage
+
+    🛡️ Security
+    ufw-status       Show UFW status
+    ports-list       List open ports and associated services
+    check-updates    Check for security updates
+    killport <port>  Kill process using a port
+
+    ⚙️ Services
+    service-list          List active services
+    service-restart <srv> Restart a service
+
+    💡 Tip: Replace [PACKAGE] with package name
+    🔗 Repository: https://github.com/alexperezortuno/linux-package-manager
+EOF
+}
+
+# Function to show help for Arch-based distributions
+show_commands_arch() {
+    cat << EOF
+    🔹 Linux Package Manager (lpm) 🔹
+    Automates system updates, upgrades, and cleanup tasks across distributions.
+
+    📌 Usage:
+      lpm [OPTION]
+
+    🛠️ Options:
+      -h, --help             Show this help message.
+      -v, --version          Show script version.
+
+    🔧 System Maintenance
+    (no args)   Update, upgrade and clean all
+
+    📚 Available options
+
+    clean       Clean package cache
+    cache:stats Show cache statistics
+
+    📦 Package Management
+    pkg:install [PACKAGE]      Install a package
+    pkg:installed              List installed packages
+    pkg:upgrade [PACKAGE]      Upgrade specific package
+    pkg:remove [PACKAGE]       Remove a package
+    pkg:find [PACKAGE]         Search for a package
+    pkg:download [PACKAGE]     Download package (not installed)
+    pkg:dependencies [PACKAGE] Check package dependencies
+    pkg:description [PACKAGE]  Show package description
+    pkg:descriptions           List all packages with descriptions
+
+    💾 Memory Management
+    freemem         Free up memory
+
+    📊 Monitoring
+    sys-info        Show system information
+    disk-usage      Show disk usage by partition
+    memory-info     Show detailed memory usage
+
+    🛡️ Security
+    ufw-status       Show UFW status
+    ports-list       List open ports and associated services
+    check-updates    Check for security updates
+    killport <port>  Kill process using a port
+
+    ⚙️ Services
+    service-list          List active services
+    service-restart <srv> Restart a service
+
+    💡 Tip: Replace [PACKAGE] with package name
+    🔗 Repository: https://github.com/alexperezortuno/linux-package-manager
+EOF
+}
+
+# Detect package manager and show appropriate help text
+show_commands() {
+    PACKAGE_MANAGER=$(detect_distro)
+
+    if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        show_commands_arch
+    elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        show_commands_fedora
+    else
+        cat << EOF
+    🔹 Linux Package Manager (lpm) 🔹
+    Automates system updates, upgrades, and cleanup tasks across distributions.
+
+    📌 Usage:
+      lpm [OPTION]
+
+    🛠️ Options:
+      -h, --help             Show this help message.
+      -v, --version          Show script version.
+
+    🔧 System Maintenance
+    (no args)   Update, upgrade and clean all
+
+    📚 Available options
+
+    clean       Clean downloaded .deb packages from cache
+    cache:stats Show cache statistics
+
+    📦 Package Management
+    pkg:install [PACKAGE]      Install a package
+    pkg:installed              List installed packages
+    pkg:upgrade [PACKAGE]      Upgrade specific package
+    pkg:remove [PACKAGE]       Remove a package
+    pkg:find [PACKAGE]         Search for a package
+    pkg:download [PACKAGE]     Download package source code
+    pkg:dependencies [PACKAGE] Check package dependencies
+    pkg:description [PACKAGE]  Show package description
+    pkg:descriptions           List all packages with descriptions
+
+    🔄 PPA Management
+    ppa:list          List configured PPAs
+    ppa:install [PPA] Add a PPA
+    ppa:remove [PPA]  Remove a PPA
+
+    💾 Memory Management
+    freemem         Free up memory
+
+    📊 Monitoring
+    sys:info        Show system information
+    disk:usage      Show disk usage by partition
+    memory:info     Show detailed memory usage
+
+    🛡️ Security
+    ufw-status       Show UFW status
+    ports-list       List open ports and associated services
+    check-updates    Check for security updates
+    killport <port>  Kill process using a port
+
+    ⚙️ Services
+    service:list          List active services
+    service:restart <srv> Restart a service
+
+    💡 Tip: Replace [PACKAGE] with package name and [PPA] with PPA path
+    🔗 Repository: https://github.com/alexperezortuno/linux-package-manager
+EOF
+    fi
+}
 
 case "$PARAM_1" in
+    # Show version information
+    -v|--version)
+        echo -e "${Yel}Version 1.0.0${RCol}\n";
+    ;;
+
+    # Clean package cache - removes downloaded packages no longer needed
     "clean")
+      record_clean
       echo -e "${Yel}";
-      sudo apt autoremove; sudo apt clean; sudo apt autoclean
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        sudo pacman -Sc --noconfirm
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        sudo dnf clean all
+      else
+        sudo apt autoremove; sudo apt clean; sudo apt autoclean
+      fi
       echo -e "${RCol}";
     ;;
-    "package:remove")
+
+    # Remove package and all dependencies, purge config files on Debian
+    "pkg:remove"|"package:remove")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Removing package ${PARAM_2}${RCol}\n";
-        sudo apt remove --purge "$PARAM_2"
-        sudo apt autoremove
-        sudo apt clean
+        PACKAGE_MANAGER=$(detect_distro)
+        if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+          sudo pacman -Rns "$PARAM_2"
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          sudo dnf remove "$PARAM_2" -y
+        else
+          sudo apt remove --purge "$PARAM_2"
+          sudo apt autoremove
+          sudo apt clean
+        fi
       else
         echo -e "${Yel}Please tell me what package you want to remove${RCol}\n";
+        exit 1
       fi
     ;;
-    "package:install")
-      sudo apt install "${PARAM_2}"
+
+    # Install package from repository
+    "pkg:install"|"package:install")
+      record_install
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        sudo pacman -S --noconfirm "${PARAM_2}"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        sudo dnf install -y "${PARAM_2}"
+      else
+        sudo apt install "${PARAM_2}"
+      fi
     ;;
-    "package:upgrade")
+
+    # Upgrade specific package to latest version
+    "pkg:upgrade"|"package:upgrade")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Installing package ${PARAM_2}${RCol}\n";
-        sudo apt install "$PARAM_2" --only-upgrade
+        PACKAGE_MANAGER=$(detect_distro)
+        if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+          sudo pacman -S --noconfirm "$PARAM_2"
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          sudo dnf update "$PARAM_2" -y
+        else
+          sudo apt install "$PARAM_2" --only-upgrade
+        fi
       else
         echo -e "${Red}Please tell me what package you need information${RCol}\n";
+        exit 1
       fi
     ;;
-    "package:installed")
-      sudo apt list --installed | less
+
+    # List all installed packages
+    "pkg:installed"|"package:installed")
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        pacman -Q | less
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        dnf list installed | less
+      else
+        sudo apt list --installed | less
+      fi
     ;;
-    "package:find")
+
+    # Search for installed package by name
+    "pkg:find"|"package:find")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Finding package ${PARAM_2}${RCol}\n";
-        sudo apt list --installed | grep -i "$PARAM_2"
+        PACKAGE_MANAGER=$(detect_distro)
+        if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+          pacman -Qqs "$PARAM_2"
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          dnf list "$PARAM_2" | grep -i "$PARAM_2"
+        else
+          sudo apt list --installed | grep -i "$PARAM_2"
+        fi
       else
         echo -e "${Red}Please tell me what package you need to find${RCol}\n";
+        exit 1
       fi
     ;;
-    "package:description")
+
+    # Show detailed info about a specific package
+    "pkg:description"|"package:description")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Finding package ${PARAM_2}${RCol}\n";
-        apt-cache show "$PARAM_2" | less
+        PACKAGE_MANAGER=$(detect_distro)
+        if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+          pacman -Qi "$PARAM_2" | less
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          dnf info "$PARAM_2" | less
+        else
+          apt-cache show "$PARAM_2" | less
+        fi
       else
         echo -e "${Red}Please tell me what package you need information${RCol}\n";
+        exit 1
       fi
     ;;
-    "package:descriptions")
+
+    # Search for package by name in repositories (not installed)
+    "pkg:descriptions"|"package:descriptions")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Finding package ${PARAM_2}${RCol}\n";
-        apt-cache search "$PARAM_2" | less
+        PACKAGE_MANAGER=$(detect_distro)
+        if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+          pacman -Si "$PARAM_2" | less
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          dnf search "$PARAM_2" | less
+        else
+          apt-cache search "$PARAM_2" | less
+        fi
       else
         echo -e "${Red}Please tell me what package you need to find${RCol}\n";
+        exit 1
       fi
     ;;
-    "package:dependencies")
+
+    # Show package dependency tree
+    "pkg:dependencies"|"package:dependencies")
       if [[ "$PARAM_2" != "" ]]
       then
-        apt-cache showpkg "$PARAM_2" | less
+        PACKAGE_MANAGER=$(detect_distro)
+        if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+          pactree "$PARAM_2" | less
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          dnf repoquery --requires "$PARAM_2" | less
+        else
+          apt-cache showpkg "$PARAM_2" | less
+        fi
       else
         echo -e "${Red}Please tell me what package you need to see${RCol}\n";
+        exit 1
       fi
     ;;
-    "package:download")
+
+    # Download package to cache without installing
+    "pkg:download"|"package:download")
       if [[ "$PARAM_2" != "" ]]
       then
-        sudo apt-get --download-only source "$PARAM_2"
+        PACKAGE_MANAGER=$(detect_distro)
+        if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+          echo -e "${Yel}Downloading package ${PARAM_2}${RCol}\n";
+          pacman -Sw "$PARAM_2" --noconfirm
+        elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+          echo -e "${Yel}Downloading package ${PARAM_2}${RCol}\n";
+          dnf download "$PARAM_2"
+        else
+          sudo apt-get --download-only source "$PARAM_2"
+        fi
       else
         echo -e "${Red}Please tell me what package needs to download${RCol}\n";
+        exit 1
       fi
     ;;
-    "package:list")
-      dpkg --list
+
+    # List all installed packages (alternative command)
+    "pkg:list"|"package:list")
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        pacman -Q
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        dnf list installed
+      else
+        dpkg --list
+      fi
     ;;
+
+    # List configured PPAs or repository files
     "ppa:list")
-      apt policy
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        echo -e "${Yel}PPAs are not used in Arch Linux${RCol}\n";
+        echo -e "${Yel}Use /etc/pacman.conf for repository configuration${RCol}\n";
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Yel}RPMFusion and other repos configured in /etc/yum.repos.d/${RCol}\n";
+        ls /etc/yum.repos.d/ | grep -E '\.repo$' | head -10
+      else
+        apt policy
+      fi
     ;;
+
+    # Add a PPA repository (Debian/Ubuntu only)
     "ppa:install")
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        echo -e "${Yel}PPAs are not used in Arch Linux${RCol}\n";
+        echo -e "${Yel}Use pacman.conf or AUR helpers instead${RCol}\n";
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Yel}RPM-based systems use repos in /etc/yum.repos.d/${RCol}\n";
+        echo -e "${Yel}Use 'dnf install dnf-plugins-core' then 'dnf config-manager --add-repo <repo>'${RCol}\n";
+      else
         if [[ "$PARAM_2" != "" ]]
         then
             sudo add-apt-repository ppa:"$PARAM_2" -y
             sudo apt update
         else
             echo -e "${Red}Please need a PPA ${RCol}\n";
+            exit 1
         fi
+      fi
     ;;
+
+    # Remove a PPA repository (Debian/Ubuntu only)
     "ppa:remove")
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        echo -e "${Yel}PPAs are not used in Arch Linux${RCol}\n";
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Yel}RPM-based systems use repo removal from /etc/yum.repos.d/${RCol}\n";
+      else
         if [[ "$PARAM_2" != "" ]]
         then
             sudo add-apt-repository --remove ppa:"$PARAM_2" -y
             sudo apt update
         else
             echo -e "${Red}Please tell me what ppa needs remove${RCol}\n";
+            exit 1
         fi
+      fi
     ;;
+
+    # Show package cache statistics and contents
     "cache:stats")
-      apt-cache stats
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        echo -e "${Gre}Pacman cache directory:${RCol}"
+        ls -lh /var/cache/pacman/pkg/ | tail -5
+        echo -e "\n${Gre}Total packages in cache:${RCol}"
+        ls /var/cache/pacman/pkg/ | wc -l
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Gre}DNF cache directory:${RCol}"
+        ls -lh /var/cache/dnf/ | tail -5
+        echo -e "\n${Gre}Total packages in cache:${RCol}"
+        ls /var/cache/dnf/ | wc -l
+      else
+        apt-cache stats
+      fi
     ;;
+
+    # Show memory hardware info (speed, size, type)
     "memory:info")
       if [[ "$PARAM_2" != "" ]]
       then
         sudo dmidecode --type 17 | more
       else
-        # sudo dmidecode --type 17
-        # sudo lshw -short -C memory
         sudo dmidecode --type 17  | grep -i speed
       fi
     ;;
+
+    # Kill process running on specific port
     "killport")
         echo -e "${Yel}Please write port to kill:  ${RCol}\r"
         read -r PORT
         sudo kill -9 "$(sudo lsof -t -i:"${PORT}")"
     ;;
+
+    # Clear memory cache and swap, then display memory usage
     "freemem")
         free -h
         su -c "echo 3 > /proc/sys/vm/drop_caches && swapoff -a && swapon -a && printf '\n%s\n' 'Ram-cache and Swap Cleared'" root
-        # echo 3 > /proc/sys/vm/drop_caches && swapoff -a && swapon -a && printf '\n%s\n' 'Ram-cache and Swap Cleared'
         free -h
     ;;
-    "list")
-      echo -e "${Gre}Without parameters${RCol}\t${Yel}Update list of packages, upgrade and clean cache${RCol}\r";
-      echo -e "${Gre}list${RCol}\t\t\t${Yel}List available commands${RCol}\r";
-      echo -e "${Gre}clean${RCol}\t\t\t${Yel}Used to free up the disk space by cleaning retrieved (downloaded) .deb files (packages) from the local repository. ${RCol}\n";
-      echo -e "${Gre}package:install\t${RCol}\t${Yel}Install package in the current machine${RCol}\r";
-      echo -e "${Gre}pacsudo age:installed${RCol}\t${Yel}List all installed packages in the current machine${RCol}\r";
-      echo -e "${Gre}package:upgrade${RCol}\t\t${Yel}Only upgrade specific package in the current machine${RCol}\r";
-      echo -e "${Gre}package:remove${RCol}\t\t${Yel}Remove specific package${RCol}\r";
-      echo -e "${Gre}package:find${RCol}\t\t${Yel}Find specific package${RCol}\r";
-      echo -e "${Gre}package:download${RCol}\t${Yel}To download only source code of particular package${RCol}\r";
-      echo -e "${Gre}package:dependencies${RCol}\t${Yel}Check the dependencies for particular software packages. whether those dependencies packages are installed or not${RCol}\r";
-      echo -e "${Gre}package:description${RCol}\t${Yel}Get description by a specific package${RCol}\r";
-      echo -e "${Gre}package:descriptions${RCol}\t${Yel}List all packages with your description${RCol}\n";
-      echo -e "${Gre}ppa:list${RCol}\t\t${Yel}List policy${RCol}\r";
-      echo -e "${Gre}ppa:install${RCol}\t\t${Yel}Install${RCol}\r";
-      echo -e "${Gre}ppa:remove${RCol}\t\t${Yel}Remove${RCol}\n";
-      echo -e "${Gre}cache:stats${RCol}\t\t${Yel}Display overall statistics about the cache${RCol}\r";
-      echo -e "${Gre}memory:info${RCol}\t\t${Yel}mem info${RCol}\r";
-      echo -e "${Gre}killport${RCol}\t\t${Yel}Killport${RCol}\r";
-      echo -e "${Gre}freemem${RCol}\t\t\t${Yel}Free memory${RCol}\r";
+
+    # Fix broken or corrupted package installations
+    "fix-broken")
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        echo -e "${Gre}Fixing broken packages...${RCol}"
+        sudo pacman -S --overwrite '*' --noconfirm
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Gre}Fixing broken packages...${RCol}"
+        sudo dnf distro-sync --noconfirm
+      else
+        echo -e "${Gre}Fixing broken packages...${RCol}"
+        sudo apt --fix-broken install
+      fi
     ;;
+
+    # Remove old kernel packages, keep current
+    "kernel:clean")
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        echo -e "${Gre}Cleaning old kernels...${RCol}"
+        sudo pacman -Rns $(pacman -Qq | grep -E 'linux-lts|linux-zen|linux-hardened' | grep -v $(uname -r | cut -d'-' -f1-2)) --noconfirm 2>/dev/null || echo "No old kernels found"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Gre}Cleaning old kernels...${RCol}"
+        sudo dnf remove $(dnf list --installed | grep -E 'kernel' | grep -v $(uname -r) | awk '{print $1}') --noconfirm 2>/dev/null || echo "No old kernels found"
+      else
+        sudo apt purge $(dpkg -l | awk '/^ii linux-image-*/{print $2}' | grep -v $(uname -r))
+      fi
+    ;;
+
+    # Check repository sources for errors or failures
+    "repo:check")
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        echo -e "${Gre}Checking repository sources...${RCol}"
+        sudo pacman -Sy 2>&1 | grep -i "error\|failed"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Gre}Checking repository sources...${RCol}"
+        sudo dnf check-update 2>&1 | grep -i "error\|failed"
+      else
+        sudo apt update 2>&1 | grep -i "failed\|error"
+      fi
+    ;;
+
+    # Search for package in repositories
+    "pkg:search")
+      [ -z "$2" ] && echo -e "${Red}Error: Package name required${RCol}" && exit 1
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        pacman -Ss "$2"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        dnf search "$2"
+      else
+        apt search "$2"
+      fi
+    ;;
+
+    # Show system information (hostname, OS, kernel, CPU)
+    "sys:info")
+      load_state
+      echo -e "${Gre}System Information:${RCol}"
+      echo -e "Hostname: $(hostname)"
+      echo -e "Uptime: $(uptime -p)"
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        . /etc/os-release
+        echo -e "OS: $NAME $VERSION"
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        . /etc/os-release
+        echo -e "OS: $NAME $VERSION"
+      else
+        echo -e "OS: $(lsb_release -d | cut -f2-)"
+      fi
+      echo -e "Kernel: $(uname -r)"
+      echo -e "CPU: $(lscpu | grep 'Model name' | cut -d':' -f2 | xargs)"
+    ;;
+
+    # Show LPM persistence state (last update, clean, counts)
+    "lpm:status")
+      load_state
+      echo -e "${Gre}LPM Persistence State:${RCol}"
+      echo -e "Last update: ${LAST_UPDATE}"
+      echo -e "Last clean:  ${LAST_CLEAN}"
+      echo -e "Install count: ${INSTALL_COUNT}"
+      echo -e "Update count: ${UPDATE_COUNT}"
+    ;;
+
+    # List all enabled services
+    "service:list")
+      systemctl list-unit-files --type=service --state=enabled
+    ;;
+
+    # Restart specified service
+    "service:restart")
+      [ -z "$2" ] && echo -e "${Red}Error: Service name required${RCol}" && exit 1
+      sudo systemctl restart "$2"
+    ;;
+
+    # Show UFW firewall status and rules
+    "ufw:status")
+      sudo ufw status verbose
+    ;;
+
+    # List all open network ports and associated services
+    "ports:list")
+      sudo ss -tulnp
+    ;;
+
+    # Show disk usage by partition
+    "disk:usage")
+      df -h
+    ;;
+
+    # Show memory usage (total, used, free)
+    "memory:info")
+      echo -e "${Gre}Memory Information:${RCol}"
+      echo -e "Total Memory: $(free -h | grep 'Mem' | awk '{print $2}')"
+      echo -e "Used Memory: $(free -h | grep 'Mem' | awk '{print $3}')"
+      echo -e "Free Memory: $(free -h | grep 'Mem' | awk '{print $4}')"
+    ;;
+
+    # Show help message
+    -h|--help)
+        show_commands
+    ;;
+
+    # Default: update all packages (full system upgrade)
     *)
-      echo -e "${Yel} Updating packages ${RCol}";
-      sudo apt update; apt list --upgradable && sudo apt upgrade -y && sudo apt autoremove; sudo apt clean; sudo apt autoclean
+      record_update
+      PACKAGE_MANAGER=$(detect_distro)
+      if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
+        echo -e "${Yel} Updating packages ${RCol}";
+        sudo pacman -Syu --noconfirm
+      elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        echo -e "${Yel} Updating packages ${RCol}";
+        sudo dnf update -y
+      else
+        echo -e "${Yel} Updating packages ${RCol}";
+        sudo apt update; apt list --upgradable && sudo apt upgrade -y && sudo apt autoremove; sudo apt clean; sudo apt autoclean
+      fi
     ;;
 esac
 
-exit 1;
+exit 0

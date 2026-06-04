@@ -1,7 +1,7 @@
 #!/bin/bash
 SOURCE="$(readlink -m install)"
 PREFIX="/install"
-IN_FILE=$(cat ~/.bashrc | grep -c "updater")
+IN_FILE=$(cat ~/.bashrc | grep -c "lpm")
 
 RCol='\e[0m';
 Yel='\e[0;33m';
@@ -12,7 +12,7 @@ removed_string=${SOURCE//$PREFIX/}
 
 function alias_installer() {
     echo -e "${Yel} Set new alias ${RCol}\n"
-    echo "alias updater='${removed_string}/./updater'" >> ~/.bashrc
+    echo "alias lpm='${removed_string}/./updater'" >> ~/.bashrc
     echo -e "${Gre} Alias set successfully ${RCol}\n"
 }
 
@@ -24,7 +24,7 @@ if [ $IN_FILE -eq 0 ]
 else
     echo -e "${Yel}${Divider}${RCol}\n"
     echo -e "${Yel} Removing alias ${RCol}\n"
-    sed -i 's/alias updater.*//g' ~/.bashrc
+    sed -i 's/alias lpm.*//g' ~/.bashrc
     alias_installer
     echo -e "${Gre}Testing file${RCol}\n"
     echo -e "${Yel}${Divider}${RCol}\n"

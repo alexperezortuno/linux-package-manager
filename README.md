@@ -1,31 +1,79 @@
-# Ubuntu updater  
-This script compiles a list of useful commands for Ubuntu, this install, remove, update and upgrade packages and other things  
+# Linux Package Manager
+
+This script compiles a list of useful commands for Linux distributions, this install, remove, update and upgrade packages and other
+things across multiple distributions.
+
+## Supported Distributions
+
+- **Debian/Ubuntu**: Uses `apt` package manager
+- **Arch Linux/ArcoLinux**: Uses `pacman` package manager
+- **Fedora/RHEL/Rocky/Alma**: Uses `dnf` package manager
+
+The script automatically detects your distribution and uses the appropriate package manager.
 
 ## Install
+
 ```
 $ sudo chmod +x install
 $ ./install
 ```
 
 ## Running commands
+
 ```
-$ updater <command-option>
+$ lpm -h
 ```
 
-## List of options
-| Option | Description |
-|--|--|  
-| -- | Without parameters Update list of packages, upgrade and clean cache  |
-| list | List available commands |
-| clean | Used to free up the disk space by cleaning retrieved (downloaded) .deb files (packages) from the local repository |
-| package:install | Install package in the current machine |
-| package:list | List all installed packages in the current machine |
-| package:upgrade | Only upgrade specific package in the current machine |
-| package:remove | Remove specific package |
-| package:find |  Find specific package |
-| package:download | To download only source code of particular package |
-| package:dependencies | Check the dependencies for particular software packages. whether those dependencies packages are installed or not |
-| package:description | Get description by a specific package |
-| package:descriptions | List all packages with your description |
-| cache:stats | Display overall statistics about the cache |
-|--|--|              
+## 🔹 Linux Package Manager (lpm) 🔹
+    Automates system updates, upgrades, and cleanup tasks across distributions.
+
+    📌 Usage:
+      lpm [OPTION]
+
+    🛠️ Options:
+      -h, --help             Show this help message.
+      -v, --version          Show script version.
+
+    🔧 System Maintenance
+    (no args)   Update, upgrade and clean all
+
+    📚 Available options
+
+    clean       Clean package cache
+    cache:stats Show cache statistics
+
+    📦 Package Management
+    pkg:install [PACKAGE]      Install a package
+    pkg:installed              List installed packages
+    pkg:upgrade [PACKAGE]      Upgrade specific package
+    pkg:remove [PACKAGE]       Remove a package
+    pkg:find [PACKAGE]         Search for a package
+    pkg:download [PACKAGE]     Download package
+    pkg:dependencies [PACKAGE] Check package dependencies
+    pkg:description [PACKAGE]  Show package description
+    pkg:descriptions           List all packages with descriptions
+
+    🔄 PPA Management (Debian/Ubuntu only)
+    ppa:list          List configured PPAs
+    ppa:install <ppa> Add a PPA
+    ppa:remove <ppa>  Remove a PPA
+
+    💾 Memory Management
+    freemem         Free up memory
+
+    📊 Monitoring
+    sys-info        Show system information
+    disk-usage      Show disk usage by partition
+    memory-info     Show detailed memory usage
+
+    🛡️ Security
+    ufw-status       Show UFW status
+    ports-list       List open ports and associated services
+    check-updates    Check for security updates
+    killport <port>  Kill process using a port
+
+    ⚙️ Services
+    service-list          List active services
+    service-restart <srv> Restart a service
+
+    💡 Tip: Replace [PACKAGE] with package name
