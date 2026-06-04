@@ -205,9 +205,9 @@ show_commands() {
     freemem         Free up memory
 
     📊 Monitoring
-    sys-info        Show system information
-    disk-usage      Show disk usage by partition
-    memory-info     Show detailed memory usage
+    sys:info        Show system information
+    disk:usage      Show disk usage by partition
+    memory:info     Show detailed memory usage
 
     🛡️ Security
     ufw-status       Show UFW status
@@ -216,8 +216,8 @@ show_commands() {
     killport <port>  Kill process using a port
 
     ⚙️ Services
-    service-list          List active services
-    service-restart <srv> Restart a service
+    service:list          List active services
+    service:restart <srv> Restart a service
 
     💡 Tip: Replace [PACKAGE] with package name and [PPA] with PPA path
     🔗 Repository: https://github.com/alexperezortuno/linux-package-manager
@@ -241,7 +241,7 @@ case "$PARAM_1" in
       fi
       echo -e "${RCol}";
     ;;
-    "package:remove")
+    "pkg:remove"|"package:remove")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Removing package ${PARAM_2}${RCol}\n";
@@ -260,7 +260,7 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
-    "package:install")
+    "pkg:install"|"package:install")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         sudo pacman -S --noconfirm "${PARAM_2}"
@@ -270,7 +270,7 @@ case "$PARAM_1" in
         sudo apt install "${PARAM_2}"
       fi
     ;;
-    "package:upgrade")
+    "pkg:upgrade"|"package:upgrade")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Installing package ${PARAM_2}${RCol}\n";
@@ -287,7 +287,7 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
-    "package:installed")
+    "pkg:installed"|"package:installed")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         pacman -Q | less
@@ -297,7 +297,7 @@ case "$PARAM_1" in
         sudo apt list --installed | less
       fi
     ;;
-    "package:find")
+    "pkg:find"|"package:find")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Finding package ${PARAM_2}${RCol}\n";
@@ -314,7 +314,7 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
-    "package:description")
+    "pkg:description"|"package:description")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Finding package ${PARAM_2}${RCol}\n";
@@ -331,7 +331,7 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
-    "package:descriptions")
+    "pkg:descriptions"|"package:descriptions")
       if [[ "$PARAM_2" != "" ]]
       then
         echo -e "${Yel}Finding package ${PARAM_2}${RCol}\n";
@@ -348,7 +348,7 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
-    "package:dependencies")
+    "pkg:dependencies"|"package:dependencies")
       if [[ "$PARAM_2" != "" ]]
       then
         PACKAGE_MANAGER=$(detect_distro)
@@ -364,7 +364,7 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
-    "package:download")
+    "pkg:download"|"package:download")
       if [[ "$PARAM_2" != "" ]]
       then
         PACKAGE_MANAGER=$(detect_distro)
@@ -382,7 +382,7 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
-    "package:list")
+    "pkg:list"|"package:list")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         pacman -Q
@@ -487,7 +487,7 @@ case "$PARAM_1" in
         sudo apt --fix-broken install
       fi
     ;;
-    "kernel-clean")
+    "kernel:clean")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Gre}Cleaning old kernels...${RCol}"
@@ -499,7 +499,7 @@ case "$PARAM_1" in
         sudo apt purge $(dpkg -l | awk '/^ii linux-image-*/{print $2}' | grep -v $(uname -r))
       fi
     ;;
-    "repo-check")
+    "repo:check")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Gre}Checking repository sources...${RCol}"
@@ -511,7 +511,7 @@ case "$PARAM_1" in
         sudo apt update 2>&1 | grep -i "failed\|error"
       fi
     ;;
-    "pkg-search")
+    "pkg:search")
       [ -z "$2" ] && echo -e "${Red}Error: Package name required${RCol}" && exit 1
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -522,7 +522,7 @@ case "$PARAM_1" in
         apt search "$2"
       fi
     ;;
-    "sys-info")
+    "sys:info")
       echo -e "${Gre}System Information:${RCol}"
       echo -e "Hostname: $(hostname)"
       echo -e "Uptime: $(uptime -p)"
@@ -539,23 +539,23 @@ case "$PARAM_1" in
       echo -e "Kernel: $(uname -r)"
       echo -e "CPU: $(lscpu | grep 'Model name' | cut -d':' -f2 | xargs)"
     ;;
-    "service-list")
+    "service:list")
       systemctl list-unit-files --type=service --state=enabled
     ;;
-    "service-restart")
+    "service:restart")
       [ -z "$2" ] && echo -e "${Red}Error: Service name required${RCol}" && exit 1
       sudo systemctl restart "$2"
     ;;
-    "ufw-status")
+    "ufw:status")
       sudo ufw status verbose
     ;;
-    "ports-list")
+    "ports:list")
       sudo ss -tulnp
     ;;
-    "disk-usage")
+    "disk:usage")
       df -h
     ;;
-    "memory-info")
+    "memory:info")
       echo -e "${Gre}Memory Information:${RCol}"
       echo -e "Total Memory: $(free -h | grep 'Mem' | awk '{print $2}')"
       echo -e "Used Memory: $(free -h | grep 'Mem' | awk '{print $3}')"
