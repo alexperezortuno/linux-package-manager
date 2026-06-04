@@ -2,6 +2,63 @@
 
 PARAM_1=$1
 PARAM_2=$2
+
+# Persistence
+LPM_STATE_DIR="${HOME}/.lpm"
+LPM_STATE_FILE="${LPM_STATE_DIR}/state"
+LPM_HISTORY_FILE="${LPM_STATE_DIR}/history"
+
+# Ensure state directory exists, create if missing
+function ensure_state_dir() {
+    [[ -d "$LPM_STATE_DIR" ]] || mkdir -p "$LPM_STATE_DIR"
+}
+
+# Load persisted state from file, or initialize defaults if file missing
+function load_state() {
+    ensure_state_dir
+    if [[ -f "$LPM_STATE_FILE" ]]; then
+        source "$LPM_STATE_FILE"
+    else
+        LAST_UPDATE="never"
+        LAST_CLEAN="never"
+        INSTALL_COUNT=0
+        UPDATE_COUNT=0
+    fi
+}
+
+# Persist current state to file
+function save_state() {
+    ensure_state_dir
+    cat > "$LPM_STATE_FILE" << EOF
+LAST_UPDATE="${LAST_UPDATE}"
+LAST_CLEAN="${LAST_CLEAN}"
+INSTALL_COUNT=${INSTALL_COUNT}
+UPDATE_COUNT=${UPDATE_COUNT}
+EOF
+}
+
+# Increment install counter and persist
+function record_install() {
+    load_state
+    INSTALL_COUNT=$((INSTALL_COUNT + 1))
+    save_state
+}
+
+# Record last update timestamp and increment update counter
+function record_update() {
+    load_state
+    LAST_UPDATE=$(date +"%Y-%m-%d %H:%M:%S")
+    UPDATE_COUNT=$((UPDATE_COUNT + 1))
+    save_state
+}
+
+# Record last clean timestamp
+function record_clean() {
+    load_state
+    LAST_CLEAN=$(date +"%Y-%m-%d %H:%M:%S")
+    save_state
+}
+
 # Colors
 RCol='\033[0m'    # Text Reset
 Red='\033[0;31m'  # Red
@@ -14,11 +71,11 @@ detect_distro() {
     # Default to Debian/Ubuntu (apt)
     DISTRO="debian"
     PACKAGE_MANAGER="apt"
-    
+
     # Check /etc/os-release for distribution info
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
-        
+
         # Check for Fedora/RHEL/CentOS
         if [[ "$ID" == "fedora" ]] || [[ "$ID" == "rhel" ]] || [[ "$ID" == "centos" ]] || [[ "$ID" == "rocky" ]] || [[ "$ID" == "alma" ]]; then
             DISTRO="fedora"
@@ -29,7 +86,7 @@ detect_distro() {
             PACKAGE_MANAGER="pacman"
         fi
     fi
-    
+
     # Fallback check for pacman presence
     if command -v pacman &> /dev/null; then
         if [[ -f /etc/arch-release ]] || [[ "$DISTRO" == "arch" ]]; then
@@ -37,13 +94,13 @@ detect_distro() {
             PACKAGE_MANAGER="pacman"
         fi
     fi
-    
+
     # Fallback check for dnf presence (Fedora/RHEL)
     if command -v dnf &> /dev/null; then
         DISTRO="fedora"
         PACKAGE_MANAGER="dnf"
     fi
-    
+
     echo "$PACKAGE_MANAGER"
 }
 
@@ -157,10 +214,10 @@ show_commands_arch() {
 EOF
 }
 
+# Detect package manager and show appropriate help text
 show_commands() {
-    # Detect package manager and show appropriate help
     PACKAGE_MANAGER=$(detect_distro)
-    
+
     if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         show_commands_arch
     elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
@@ -226,10 +283,14 @@ EOF
 }
 
 case "$PARAM_1" in
+    # Show version information
     -v|--version)
         echo -e "${Yel}Version 1.0.0${RCol}\n";
     ;;
+
+    # Clean package cache - removes downloaded packages no longer needed
     "clean")
+      record_clean
       echo -e "${Yel}";
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -241,6 +302,8 @@ case "$PARAM_1" in
       fi
       echo -e "${RCol}";
     ;;
+
+    # Remove package and all dependencies, purge config files on Debian
     "pkg:remove"|"package:remove")
       if [[ "$PARAM_2" != "" ]]
       then
@@ -260,7 +323,10 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
+
+    # Install package from repository
     "pkg:install"|"package:install")
+      record_install
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         sudo pacman -S --noconfirm "${PARAM_2}"
@@ -270,6 +336,8 @@ case "$PARAM_1" in
         sudo apt install "${PARAM_2}"
       fi
     ;;
+
+    # Upgrade specific package to latest version
     "pkg:upgrade"|"package:upgrade")
       if [[ "$PARAM_2" != "" ]]
       then
@@ -287,6 +355,8 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
+
+    # List all installed packages
     "pkg:installed"|"package:installed")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -297,6 +367,8 @@ case "$PARAM_1" in
         sudo apt list --installed | less
       fi
     ;;
+
+    # Search for installed package by name
     "pkg:find"|"package:find")
       if [[ "$PARAM_2" != "" ]]
       then
@@ -314,6 +386,8 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
+
+    # Show detailed info about a specific package
     "pkg:description"|"package:description")
       if [[ "$PARAM_2" != "" ]]
       then
@@ -331,6 +405,8 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
+
+    # Search for package by name in repositories (not installed)
     "pkg:descriptions"|"package:descriptions")
       if [[ "$PARAM_2" != "" ]]
       then
@@ -348,6 +424,8 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
+
+    # Show package dependency tree
     "pkg:dependencies"|"package:dependencies")
       if [[ "$PARAM_2" != "" ]]
       then
@@ -364,6 +442,8 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
+
+    # Download package to cache without installing
     "pkg:download"|"package:download")
       if [[ "$PARAM_2" != "" ]]
       then
@@ -382,6 +462,8 @@ case "$PARAM_1" in
         exit 1
       fi
     ;;
+
+    # List all installed packages (alternative command)
     "pkg:list"|"package:list")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -392,6 +474,8 @@ case "$PARAM_1" in
         dpkg --list
       fi
     ;;
+
+    # List configured PPAs or repository files
     "ppa:list")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -404,6 +488,8 @@ case "$PARAM_1" in
         apt policy
       fi
     ;;
+
+    # Add a PPA repository (Debian/Ubuntu only)
     "ppa:install")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -423,6 +509,8 @@ case "$PARAM_1" in
         fi
       fi
     ;;
+
+    # Remove a PPA repository (Debian/Ubuntu only)
     "ppa:remove")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -440,6 +528,8 @@ case "$PARAM_1" in
         fi
       fi
     ;;
+
+    # Show package cache statistics and contents
     "cache:stats")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -456,6 +546,8 @@ case "$PARAM_1" in
         apt-cache stats
       fi
     ;;
+
+    # Show memory hardware info (speed, size, type)
     "memory:info")
       if [[ "$PARAM_2" != "" ]]
       then
@@ -464,16 +556,22 @@ case "$PARAM_1" in
         sudo dmidecode --type 17  | grep -i speed
       fi
     ;;
+
+    # Kill process running on specific port
     "killport")
         echo -e "${Yel}Please write port to kill:  ${RCol}\r"
         read -r PORT
         sudo kill -9 "$(sudo lsof -t -i:"${PORT}")"
     ;;
+
+    # Clear memory cache and swap, then display memory usage
     "freemem")
         free -h
         su -c "echo 3 > /proc/sys/vm/drop_caches && swapoff -a && swapon -a && printf '\n%s\n' 'Ram-cache and Swap Cleared'" root
         free -h
     ;;
+
+    # Fix broken or corrupted package installations
     "fix-broken")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -487,6 +585,8 @@ case "$PARAM_1" in
         sudo apt --fix-broken install
       fi
     ;;
+
+    # Remove old kernel packages, keep current
     "kernel:clean")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -499,6 +599,8 @@ case "$PARAM_1" in
         sudo apt purge $(dpkg -l | awk '/^ii linux-image-*/{print $2}' | grep -v $(uname -r))
       fi
     ;;
+
+    # Check repository sources for errors or failures
     "repo:check")
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
@@ -511,6 +613,8 @@ case "$PARAM_1" in
         sudo apt update 2>&1 | grep -i "failed\|error"
       fi
     ;;
+
+    # Search for package in repositories
     "pkg:search")
       [ -z "$2" ] && echo -e "${Red}Error: Package name required${RCol}" && exit 1
       PACKAGE_MANAGER=$(detect_distro)
@@ -522,7 +626,10 @@ case "$PARAM_1" in
         apt search "$2"
       fi
     ;;
+
+    # Show system information (hostname, OS, kernel, CPU)
     "sys:info")
+      load_state
       echo -e "${Gre}System Information:${RCol}"
       echo -e "Hostname: $(hostname)"
       echo -e "Uptime: $(uptime -p)"
@@ -539,32 +646,59 @@ case "$PARAM_1" in
       echo -e "Kernel: $(uname -r)"
       echo -e "CPU: $(lscpu | grep 'Model name' | cut -d':' -f2 | xargs)"
     ;;
+
+    # Show LPM persistence state (last update, clean, counts)
+    "lpm:status")
+      load_state
+      echo -e "${Gre}LPM Persistence State:${RCol}"
+      echo -e "Last update: ${LAST_UPDATE}"
+      echo -e "Last clean:  ${LAST_CLEAN}"
+      echo -e "Install count: ${INSTALL_COUNT}"
+      echo -e "Update count: ${UPDATE_COUNT}"
+    ;;
+
+    # List all enabled services
     "service:list")
       systemctl list-unit-files --type=service --state=enabled
     ;;
+
+    # Restart specified service
     "service:restart")
       [ -z "$2" ] && echo -e "${Red}Error: Service name required${RCol}" && exit 1
       sudo systemctl restart "$2"
     ;;
+
+    # Show UFW firewall status and rules
     "ufw:status")
       sudo ufw status verbose
     ;;
+
+    # List all open network ports and associated services
     "ports:list")
       sudo ss -tulnp
     ;;
+
+    # Show disk usage by partition
     "disk:usage")
       df -h
     ;;
+
+    # Show memory usage (total, used, free)
     "memory:info")
       echo -e "${Gre}Memory Information:${RCol}"
       echo -e "Total Memory: $(free -h | grep 'Mem' | awk '{print $2}')"
       echo -e "Used Memory: $(free -h | grep 'Mem' | awk '{print $3}')"
       echo -e "Free Memory: $(free -h | grep 'Mem' | awk '{print $4}')"
     ;;
+
+    # Show help message
     -h|--help)
         show_commands
     ;;
+
+    # Default: update all packages (full system upgrade)
     *)
+      record_update
       PACKAGE_MANAGER=$(detect_distro)
       if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
         echo -e "${Yel} Updating packages ${RCol}";
