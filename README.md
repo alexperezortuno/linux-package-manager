@@ -1,79 +1,143 @@
-# Linux Package Manager
+# Linux Package Manager (lpm)
 
-This script compiles a list of useful commands for Linux distributions, this install, remove, update and upgrade packages and other
-things across multiple distributions.
+Universal package management wrapper for Debian/Ubuntu, Arch Linux, and Fedora/RHEL. One command to update, install, remove, and clean packages across any supported distribution.
 
 ## Supported Distributions
 
-- **Debian/Ubuntu**: Uses `apt` package manager
-- **Arch Linux/ArcoLinux**: Uses `pacman` package manager
-- **Fedora/RHEL/Rocky/Alma**: Uses `dnf` package manager
+| Distribution | Package Manager |
+|--------------|-----------------|
+| Debian/Ubuntu | `apt` |
+| Arch Linux / ArcoLinux | `pacman` |
+| Fedora / RHEL / Rocky / Alma | `dnf` |
 
-The script automatically detects your distribution and uses the appropriate package manager.
+Script auto-detects your distribution on execution.
 
-## Install
+## Installation
 
-```
-$ sudo chmod +x install
-$ ./install
-```
-
-## Running commands
-
-```
-$ lpm -h
+```bash
+sudo chmod +x install
+./install
 ```
 
-## 🔹 Linux Package Manager (lpm) 🔹
-    Automates system updates, upgrades, and cleanup tasks across distributions.
+Install script adds `lpm` alias to `~/.bashrc`.
 
-    📌 Usage:
-      lpm [OPTION]
+## Usage
 
-    🛠️ Options:
-      -h, --help             Show this help message.
-      -v, --version          Show script version.
+```bash
+lpm [COMMAND] [ARGUMENTS]
+```
 
-    🔧 System Maintenance
-    (no args)   Update, upgrade and clean all
+## Commands
 
-    📚 Available options
+### System Maintenance
 
-    clean       Clean package cache
-    cache:stats Show cache statistics
+| Command | Description |
+|---------|-------------|
+| `lpm` | Full system update, upgrade, and cache clean |
+| `clean` | Remove package cache |
+| `cache:stats` | Show cache directory size and package count |
+| `fix-broken` | Repair corrupted or broken package installations |
+| `kernel:clean` | Remove old kernel packages (keeps current) |
+| `repo:check` | Check repository sources for errors |
 
-    📦 Package Management
-    pkg:install [PACKAGE]      Install a package
-    pkg:installed              List installed packages
-    pkg:upgrade [PACKAGE]      Upgrade specific package
-    pkg:remove [PACKAGE]       Remove a package
-    pkg:find [PACKAGE]         Search for a package
-    pkg:download [PACKAGE]     Download package
-    pkg:dependencies [PACKAGE] Check package dependencies
-    pkg:description [PACKAGE]  Show package description
-    pkg:descriptions           List all packages with descriptions
+### Package Management
 
-    🔄 PPA Management (Debian/Ubuntu only)
-    ppa:list          List configured PPAs
-    ppa:install <ppa> Add a PPA
-    ppa:remove <ppa>  Remove a PPA
+| Command | Description |
+|---------|-------------|
+| `pkg:install [PKG]` | Install package from repository |
+| `pkg:remove [PKG]` | Remove package and dependencies |
+| `pkg:upgrade [PKG]` | Upgrade specific package to latest version |
+| `pkg:search [PKG]` | Search for package in repositories |
+| `pkg:installed` | List all installed packages |
+| `pkg:find [PKG]` | Find installed package by name |
+| `pkg:description [PKG]` | Show detailed package information |
+| `pkg:descriptions [PKG]` | Search repositories for package descriptions |
+| `pkg:dependencies [PKG]` | Show package dependency tree |
+| `pkg:download [PKG]` | Download package to cache (no install) |
+| `pkg:list` | List all installed packages |
 
-    💾 Memory Management
-    freemem         Free up memory
+### PPA Management (Debian/Ubuntu only)
 
-    📊 Monitoring
-    sys-info        Show system information
-    disk-usage      Show disk usage by partition
-    memory-info     Show detailed memory usage
+| Command | Description |
+|---------|-------------|
+| `ppa:list` | List configured PPAs |
+| `ppa:install <PPA>` | Add a PPA repository |
+| `ppa:remove <PPA>` | Remove a PPA repository |
 
-    🛡️ Security
-    ufw-status       Show UFW status
-    ports-list       List open ports and associated services
-    check-updates    Check for security updates
-    killport <port>  Kill process using a port
+### Memory Management
 
-    ⚙️ Services
-    service-list          List active services
-    service-restart <srv> Restart a service
+| Command | Description |
+|---------|-------------|
+| `freemem` | Clear memory cache and swap, then show usage |
+| `memory:info` | Show memory usage (total, used, free) |
+| `memory:info full` | Show detailed hardware memory info |
 
-    💡 Tip: Replace [PACKAGE] with package name
+### Monitoring
+
+| Command | Description |
+|---------|-------------|
+| `sys:info` | Show system info (hostname, OS, kernel, CPU) |
+| `disk:usage` | Show disk usage by partition |
+| `ports:list` | List open ports and associated services |
+
+### Security
+
+| Command | Description |
+|---------|-------------|
+| `ufw:status` | Show UFW firewall status and rules |
+| `killport <PORT>` | Kill process using specified port |
+
+### Services
+
+| Command | Description |
+|---------|-------------|
+| `service:list` | List all enabled services |
+| `service:restart <SERVICE>` | Restart specified service |
+
+### Persistence
+
+| Command | Description |
+|---------|-------------|
+| `lpm:status` | Show LPM state (last update, install/update counts) |
+
+### Help
+
+| Command | Description |
+|---------|-------------|
+| `-h`, `--help` | Show help message |
+| `-v`, `--version` | Show script version |
+
+## Quick Examples
+
+```bash
+# Update entire system
+lpm
+
+# Install a package
+lpm pkg:install neofetch
+
+# Remove a package
+lpm pkg:remove old-package
+
+# Search for package
+lpm pkg:search vim
+
+# Check disk usage
+lpm disk:usage
+
+# Free memory
+lpm freemem
+
+# View persistence state
+lpm lpm:status
+```
+
+## Persistence
+
+LPM tracks usage statistics in `~/.lpm/state`:
+- Last system update timestamp
+- Last cache clean timestamp
+- Total packages installed via LPM
+- Total system updates via LPM
+
+View state with `lpm lpm:status`.
